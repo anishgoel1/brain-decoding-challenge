@@ -1,1 +1,1 @@
-# telepath_challenge
+# telepathic_challenge
