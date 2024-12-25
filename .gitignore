@@ -45,3 +45,6 @@ Thumbs.db
 
 # Ruff cache
 .ruff_cache/
+
+# VSCode
+.vscode/
