@@ -1,12 +1,16 @@
 import os
 import numpy as np
 from sklearn.model_selection import StratifiedKFold
-from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score
-from sklearn.svm import SVC
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM, Dense, Conv1D, MaxPooling1D, Dropout, BatchNormalization, Input
+from tensorflow.keras.layers import (
+    LSTM,
+    Dense,
+    Conv1D,
+    MaxPooling1D,
+    Dropout,
+    BatchNormalization,
+    Input,
+)
 import tensorflow as tf
 
 
@@ -33,7 +37,7 @@ class DataLoader:
 
         for trial, label in zip(data, labels):
             for i in range(0, self.max_timepoints - self.window_size + 1, self.stride):
-                window = trial[:, i:i + self.window_size]
+                window = trial[:, i : i + self.window_size]
                 windows.append(window)
                 window_labels.append(label)
 
@@ -54,13 +58,19 @@ class DataLoader:
             folder_path = os.path.join(subject_path, date_folder)
             if os.path.isdir(folder_path):
                 try:
-                    # use preprocessed data from the folders 
-                    data_path = os.path.join(folder_path, f"{date_folder}PreprocessedData.npy")
+                    # use preprocessed data from the folders
+                    data_path = os.path.join(
+                        folder_path, f"{date_folder}PreprocessedData.npy"
+                    )
                     labels_path = os.path.join(folder_path, f"{date_folder}Labels.npy")
 
                     data = np.load(data_path)
                     # the labels are in the format [timestamp, duration, label]
-                    labels = np.load(labels_path, allow_pickle=True)[:, 2].astype(float).astype(int)
+                    labels = (
+                        np.load(labels_path, allow_pickle=True)[:, 2]
+                        .astype(float)
+                        .astype(int)
+                    )
 
                     for trial, label in zip(data, labels):
                         trial = self._pad_or_trim_trial(trial)
@@ -84,7 +94,7 @@ class DataLoader:
         :return: Padded or trimmed trial.
         """
         if trial.shape[1] > self.max_timepoints:
-            return trial[:, :self.max_timepoints]
+            return trial[:, : self.max_timepoints]
         elif trial.shape[1] < self.max_timepoints:
             padding = np.zeros((trial.shape[0], self.max_timepoints - trial.shape[1]))
             return np.hstack((trial, padding))
@@ -99,6 +109,7 @@ class DataLoader:
         mean, std = np.mean(data, axis=0), np.std(data, axis=0)
         return (data - mean) / (std + 1e-8)
 
+
 def create_conv_lstm_model(X, num_classes):
     """
     Create a Convolutional LSTM model.
@@ -106,29 +117,29 @@ def create_conv_lstm_model(X, num_classes):
     :param num_classes: Number of classes.
     :return: Convolutional LSTM model.
     """
-    model = Sequential([
-        Input(shape=(X.shape[1], X.shape[2])),
-        Conv1D(64, 3, activation='relu'),
-        BatchNormalization(),
-        MaxPooling1D(2),
-        Dropout(0.3),
-
-        Conv1D(128, 3, activation='relu'),
-        BatchNormalization(),
-        MaxPooling1D(2),
-        Dropout(0.3),
-
-        LSTM(128, return_sequences=True),
-        Dropout(0.3),
-        LSTM(64),
-        Dropout(0.3),
-
-        Dense(64, activation='relu'),
-        BatchNormalization(),
-        Dropout(0.3),
-        Dense(num_classes, activation='softmax')
-    ])
+    model = Sequential(
+        [
+            Input(shape=(X.shape[1], X.shape[2])),
+            Conv1D(64, 3, activation="relu"),
+            BatchNormalization(),
+            MaxPooling1D(2),
+            Dropout(0.3),
+            Conv1D(128, 3, activation="relu"),
+            BatchNormalization(),
+            MaxPooling1D(2),
+            Dropout(0.3),
+            LSTM(128, return_sequences=True),
+            Dropout(0.3),
+            LSTM(64),
+            Dropout(0.3),
+            Dense(64, activation="relu"),
+            BatchNormalization(),
+            Dropout(0.3),
+            Dense(num_classes, activation="softmax"),
+        ]
+    )
     return model
+
 
 def train_and_evaluate_conv_lstm_cv(X, y, subject_name):
     """
@@ -150,33 +161,29 @@ def train_and_evaluate_conv_lstm_cv(X, y, subject_name):
 
         model = create_conv_lstm_model(X, len(np.unique(y)))
 
-        tf.keras.mixed_precision.set_global_policy('mixed_float16')
+        tf.keras.mixed_precision.set_global_policy("mixed_float16")
 
         model.compile(
             optimizer=tf.keras.optimizers.Adam(learning_rate=0.001),
-            loss='categorical_crossentropy',
-            metrics=['accuracy']
+            loss="categorical_crossentropy",
+            metrics=["accuracy"],
         )
 
-        model.fit(
-            X_train, y_train,
-            epochs=75,
-            batch_size=64,
-            verbose=0
-        )
+        model.fit(X_train, y_train, epochs=75, batch_size=64, verbose=0)
 
         test_loss, test_accuracy = model.evaluate(X_test, y_test, verbose=0)
         fold_accuracies.append(test_accuracy)
         print(f"Fold {fold + 1} Test Accuracy: {test_accuracy * 100:.2f}%")
 
     avg_accuracy = np.mean(fold_accuracies)
-    print(f"\n{subject_name} 5-Fold Cross-Validation Average Test Accuracy: {avg_accuracy * 100:.2f}%")
+    print(
+        f"\n{subject_name} 5-Fold Cross-Validation Average Test Accuracy: {avg_accuracy * 100:.2f}%"
+    )
     return avg_accuracy
 
+
 if __name__ == "__main__":
-    """
-    Main script to load data, perform 5-fold cross-validation, and evaluate models.
-    """
+    """Main script to load data, perform 5-fold cross-validation, and evaluate models."""
     loaders = [DataLoader(max_timepoints=93), DataLoader(max_timepoints=68)]
     patients = ["New10Subject1", "New10Subject2"]
     for patient, loader in zip(patients, loaders):
